@@ -92,7 +92,7 @@ void str_del() {
 }
 
 
-"/*"	 {adjust(); count++; BEGIN(COMMENT);}
+"/*" {adjust(); count++; BEGIN(COMMENT);}
 
 \"	 {adjust(); str_init(); flag = TRUE; BEGIN(STR);}
 
@@ -114,31 +114,31 @@ void str_del() {
 "*"	 {adjust(); return TIMES;}
 "/"	 {adjust(); return DIVIDE;}
 "="	 {adjust(); return EQ;}
-"<>"     {adjust(); return NEQ;}
+"<>" {adjust(); return NEQ;}
 "<"	 {adjust(); return LT;}
-"<=" 	 {adjust(); return LE;}
+"<=" {adjust(); return LE;}
 ">"	 {adjust(); return GT;}
-">=" 	 {adjust(); return GE;}
+">=" {adjust(); return GE;}
 "&"	 {adjust(); return AND;}
 "|"	 {adjust(); return OR;}
-":=" 	 {adjust(); return ASSIGN;}
-array	 {adjust(); return ARRAY;}
-if	 {adjust(); return IF;}
-then	 {adjust(); return THEN;}
-else	 {adjust(); return ELSE;}
-while	 {adjust(); return WHILE;}
-for	 {adjust(); return FOR;}
-to	 {adjust(); return TO;}
-do	 {adjust(); return DO;}
-let	 {adjust(); return LET;}
-in	 {adjust(); return IN;}
-end	 {adjust(); return END;}
-of	 {adjust(); return OF;}
-break	 {adjust(); return BREAK;}
-nil	 {adjust(); return NIL;}
+":=" {adjust(); return ASSIGN;}
+array	{adjust(); return ARRAY;}
+if		{adjust(); return IF;}
+then	{adjust(); return THEN;}
+else	{adjust(); return ELSE;}
+while	{adjust(); return WHILE;}
+for		{adjust(); return FOR;}
+to		{adjust(); return TO;}
+do		{adjust(); return DO;}
+let		{adjust(); return LET;}
+in		{adjust(); return IN;}
+end		{adjust(); return END;}
+of		{adjust(); return OF;}
+break	{adjust(); return BREAK;}
+nil		{adjust(); return NIL;}
 function {adjust(); return FUNCTION;}
-var	 {adjust(); return VAR;}
-type  	 {adjust(); return TYPE;}
+var		{adjust(); return VAR;}
+type  	{adjust(); return TYPE;}
 [a-zA-Z]+[a-zA-Z0-9_]*	{adjust(); yylval.sval = String(yytext); return ID;}
 [0-9]+	 {adjust(); yylval.ival=atoi(yytext); return INT;}
 

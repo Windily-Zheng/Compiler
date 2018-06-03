@@ -1,3 +1,12 @@
+/**********************************************************
+ * Author        : lh
+ * Email         : lhcoder@163.com
+ * Create time   : 2017-03-01 16:27
+ * Last modified : 2017-03-02 09:51
+ * Filename      : tiger.y
+ * Description   : 
+ * *******************************************************/
+
 %{
 #include <stdio.h>
 #include "util.h"

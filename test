@@ -10,8 +10,10 @@ make
 
 for file in ../testcases/*.tig
 do
-	./a.out $file 
+	clear
+	cat $file
 	echo "$file"
+	./a.out $file 
 	read ts
 done
 
