@@ -5,7 +5,7 @@
 #include "y.tab.h"
 #include "errormsg.h"
 
-int charPos=1;
+int charPos=1;		//position field
 
 int yywrap(void)
 {
@@ -13,11 +13,11 @@ int yywrap(void)
 	return 1;
 }
 
-
+/* obtain and adjust the position field */
 void adjust(void)
 {
-	EM_tokPos=charPos;
-	charPos+=yyleng;
+	EM_tokPos=charPos;	//obtain the position
+	charPos+=yyleng;	//adjust the position
 }
 
 const int plen = 100;
@@ -55,18 +55,20 @@ void str_del() {
 %x COMMENT STR VSTR
 
 %%
-	int count = 0;
+	int count = 0;	//count the degree of comments
 	bool flag;
 
+ /* COMMENT state */
 <COMMENT>{
 	"/*" {adjust(); count++;}
 	"*/" {adjust(); count--; if(!count) BEGIN(0);}
 	\n	 {adjust(); EM_newline(); continue;}
-	\r	//widows下\r\n linux\n 吃掉可能多余的\r 下同
+	\r	
 	. adjust(); 
 	<<EOF>> {adjust(); EM_error(EM_tokPos,"EOF in comment"); return 0;}
 }
 
+ /* STR state */
 <STR>{
 	\" {adjust(); yylval.sval = String(str); str_del(); BEGIN(0); if(flag) return STRING;}
 	\\f	{adjust(); BEGIN(VSTR);}
@@ -83,6 +85,7 @@ void str_del() {
 	<<EOF>> {adjust(); EM_error(EM_tokPos,"EOF in string"); str_del(); return 0;}
 }
 
+ /* VSTR state */
 <VSTR>{
 	f\\ {adjust(); BEGIN(STR);}
 	\n	 {adjust(); EM_newline();}
@@ -91,14 +94,20 @@ void str_del() {
 	<<EOF>> {adjust(); EM_error(EM_tokPos,"EOF in string"); return 0;}
 }
 
-
+ /* Beginning of COMMENT state */
 "/*" {adjust(); count++; BEGIN(COMMENT);}
 
+ /* Beginning of STR state */
 \"	 {adjust(); str_init(); flag = TRUE; BEGIN(STR);}
 
+ /* Blank */
 [ \t]*	 {adjust(); continue;}
+
+ /* New Line */
 \n	 {adjust(); EM_newline(); continue;}
 \r
+
+ /* Punctuation */
 ","	 {adjust(); return COMMA;}
 ":"	 {adjust(); return COLON;}
 ";"	 {adjust(); return SEMICOLON;}
@@ -122,6 +131,8 @@ void str_del() {
 "&"	 {adjust(); return AND;}
 "|"	 {adjust(); return OR;}
 ":=" {adjust(); return ASSIGN;}
+
+ /* Critical Words */
 array	{adjust(); return ARRAY;}
 if		{adjust(); return IF;}
 then	{adjust(); return THEN;}
