@@ -1,12 +1,3 @@
-/**********************************************************
- * Author        : lh
- * Email         : lhcoder@163.com
- * Create time   : 2017-03-06 15:53
- * Last modified : 2017-03-20 08:31
- * Filename      : semant.c
- * Description   : 
- * *******************************************************/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include "util.h"
@@ -17,7 +8,24 @@
 #include "env.h"
 #include "semant.h"
 
-#define DB 0
+#define DB 1
+
+
+struct varRecord{
+	
+	int kind;
+	S_symbol symbol;
+	int modified;
+	union {
+		int int_value;
+		string str_value;
+	}u;
+};
+
+struct varRecord var_arr[20];
+
+int var_num = 0;
+int find = -1;
 
 struct expty {
 	Tr_exp exp;
@@ -46,7 +54,7 @@ static bool cmp_ty(Ty_ty a, Ty_ty b);
 static U_boolList makeFormalList(A_fieldList params);
 
 
-//集合操作 去重
+//there is no unique items in set
 struct set_ {
 	S_symbol s[1000];
 	int pos;
@@ -59,7 +67,7 @@ static bool set_push(set s, S_symbol x);
 
 static set s;
 
-//nested layers of loop
+//layer of loop
 static int loop;
 
 
@@ -71,7 +79,6 @@ F_fragList SEM_transProg(A_exp exp) {
 	s = set_init();
 	transExp(Tr_outermost(), NULL, venv, tenv, exp);
 #if DB
-	printf("finish\n");
 	F_printFragList(Tr_getResult());
 #endif
 	return Tr_getResult();
@@ -79,8 +86,27 @@ F_fragList SEM_transProg(A_exp exp) {
 
 struct expty transVar(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv, A_var v) {
 	assert(level);
+	int i;
 	switch (v->kind) {
 		case A_simpleVar: {
+		
+			
+			for (i = 0; i < var_num; i++)
+			{
+				if ( var_arr[i].symbol == v->u.simple && var_arr[i].modified == 0)
+				{
+					find = i;
+
+					if (var_arr[i].kind == 1)
+					{
+						return expTy(Tr_intExp(var_arr[i].u.int_value), Ty_Int());
+					}
+						
+					else
+						return expTy(Tr_intExp(var_arr[i].u.int_value), Ty_String());
+				}
+			}
+
 			E_enventry e = S_look(venv, v->u.simple);
 			if (e && e->kind == E_varEntry) 
 				return expTy(Tr_simpleVar(e->u.var.access, level), actual_ty(e->u.var.ty));
@@ -113,7 +139,6 @@ struct expty transVar(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv,
 				if (exp.ty->kind != Ty_int) 
 					EM_error(v->pos, "Subscript was not an integer");
 				else 
-					//Tr_null() -> exp.exp
 					return expTy(Tr_subscriptVar(var.exp, Tr_null()), actual_ty(var.ty->u.array));
 			}
 			return expTy(Tr_null(), actual_ty(var.ty->u.array));
@@ -215,8 +240,8 @@ struct expty transExp(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv,
 						return expTy(Tr_relExp(a->u.op.oper, left.exp, right.exp), Ty_Int());
 					return expTy(Tr_null(), Ty_Int());
 				}
-			} //end of switch (oper)
-		} // end of case A_opExp
+			} 
+		}
 		case A_recordExp: {
 			Ty_ty t = actual_ty(S_look(tenv, a->u.record.typ));
 			if (!t) {
@@ -266,7 +291,13 @@ struct expty transExp(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv,
 			return expTy(Tr_seqExp(tl), et.ty);
 		}
 		case A_assignExp: {
-			struct expty var = transVar(level, breakk, venv, tenv, a->u.assign.var);	
+			struct expty var = transVar(level, breakk, venv, tenv, a->u.assign.var);
+			if (find != -1)
+			{
+				var_arr[find].modified = 1;
+				find = -1;
+				var = transVar(level, breakk, venv, tenv, a->u.assign.var);
+			}
 			struct expty exp = transExp(level, breakk, venv, tenv, a->u.assign.exp);	
 			if (!cmp_ty(var.ty, exp.ty))
 				EM_error(a->pos, "assignment type mismatch");
@@ -301,34 +332,6 @@ struct expty transExp(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv,
 			return expTy(Tr_whileExp(t.exp, b.exp, done), Ty_Void());
 		}
 		case A_forExp: {
-		/*
-			struct expty l = transExp(level, breakk, venv, tenv, a->u.forr.lo);
-			struct expty h = transExp(level, breakk, venv, tenv, a->u.forr.hi);
-			if (l.ty->kind != Ty_int)
-				EM_error(a->pos, "low bound was not an integer");
-			if (h.ty->kind != Ty_int)
-				EM_error(a->pos, "high bound was not an integer");
-			
-			S_beginScope(venv);
-			loop++;
-			Tr_access ac = Tr_allocLocal(level, a->u.forr.escape);
-			S_enter(venv, a->u.forr.var, E_VarEntry(ac, Ty_Int()));
-			struct expty b = transExp(level, breakk, venv, tenv, a->u.forr.body);
-			S_endScope(venv);
-			loop--;
-			if (b.ty->kind != Ty_void)
-				EM_error(a->pos, "body exp shouldn't return a value");
-		*/
-		/*
-			let
-				i = lo
-				lim = hi
-			in
-				if (i < lim)
-					do  body  i++
-					while (i < lim)
-			end
-		*/
 			struct expty loet = transExp(level, breakk, venv, tenv, a->u.forr.lo);
 			struct expty hiet = transExp(level, breakk, venv, tenv, a->u.forr.hi);
 			Tr_exp done = Tr_doneExp();
@@ -396,6 +399,7 @@ struct expty transExp(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv,
 
 Tr_exp transDec(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv, A_dec d) {
 	assert(level);
+	int j, i = var_num;
 	switch (d->kind) {
 		case A_varDec: {
 			struct expty e = transExp(level, breakk, venv, tenv, d->u.var.init);
@@ -408,7 +412,41 @@ Tr_exp transDec(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv, A_dec
 					if (!cmp_ty(t, e.ty)) 
 						EM_error(d->pos, "var init type mismatch");
 #if DB
-					printf("var: %s %d\n", S_name(d->u.var.var), d->u.var.escape);
+					if (d->u.var.init->kind == A_intExp && var_num < 20)
+					{
+						for (j = 0; j < var_num; j++)
+							if (var_arr[j].symbol == d->u.var.var)
+							{
+								i = j;
+								break;
+							}
+						if (i == var_num)
+							var_num++;
+						var_arr[i].modified = 0;
+						var_arr[i].kind = 1;
+						var_arr[i].symbol = d->u.var.var;
+						var_arr[i].u.int_value = d->u.var.init->u.intt;
+						printf("var: %s %d\n", S_name(d->u.var.var), d->u.var.init->u.intt);
+					}			
+					else
+						if (d->u.var.init->kind == A_stringExp && var_num < 20)
+						{
+							for (j = 0; j < var_num; j++)
+								if (var_arr[j].symbol == d->u.var.var)
+								{
+									i = j;
+									break;
+								}
+							if (i == var_num)
+								var_num++;
+							var_arr[i].modified = 0;
+							var_arr[i].kind = 2;
+							var_arr[i].symbol = d->u.var.var;
+							var_arr[i].u.str_value = d->u.var.init->u.stringg;
+							printf("var: %s \"%s\"\n", S_name(d->u.var.var), d->u.var.init->u.stringg);
+					    }
+					else
+						printf("var: %s escape: %d\n", S_name(d->u.var.var), d->u.var.escape);
 #endif
 					S_enter(venv, d->u.var.var, E_VarEntry(ac, t));
 					return Tr_assignExp(Tr_simpleVar(ac, level), e.exp);
@@ -419,7 +457,41 @@ Tr_exp transDec(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv, A_dec
 			else if (e.ty == Ty_Nil())
 				EM_error(d->pos, "'%s' is not a record", S_name(d->u.var.var));
 #if DB
-					printf("var: %s %d\n", S_name(d->u.var.var), d->u.var.escape);
+			if (d->u.var.init->kind == A_intExp && var_num < 20)
+			{
+				for (j = 0; j < var_num; j++)
+					if (var_arr[j].symbol == d->u.var.var)
+					{
+						i = j;
+						break;
+					}
+				if (i == var_num)
+					var_num++;
+				var_arr[i].modified = 0;
+				var_arr[i].kind = 1;
+				var_arr[i].symbol = d->u.var.var;
+				var_arr[i].u.int_value = d->u.var.init->u.intt;
+				printf("var: %s %d\n", S_name(d->u.var.var), d->u.var.init->u.intt);
+			}
+			else
+				if (d->u.var.init->kind == A_stringExp && var_num < 20)
+				{
+					for (j = 0; j < var_num; j++)
+						if (var_arr[j].symbol == d->u.var.var)
+						{
+							i = j;
+							break;
+						}
+					if (i == var_num)
+						var_num++;
+					var_arr[i].modified = 0;
+					var_arr[i].kind = 2;
+					var_arr[i].symbol = d->u.var.var;
+					var_arr[i].u.str_value = d->u.var.init->u.stringg;
+					printf("var: %s \"%s\"\n", S_name(d->u.var.var), d->u.var.init->u.stringg);
+				}
+				else
+					printf("var: %s escape: %d\n", S_name(d->u.var.var), d->u.var.escape);
 #endif
 			S_enter(venv, d->u.var.var, E_VarEntry(ac, e.ty));
 			return Tr_assignExp(Tr_simpleVar(ac, level), e.exp);
