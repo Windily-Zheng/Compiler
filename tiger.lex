@@ -71,14 +71,14 @@ void str_del() {
  /* STR state */
 <STR>{
 	\" {adjust(); yylval.sval = String(str); str_del(); BEGIN(0); if(flag) return STRING;}
-	\\f	{adjust(); BEGIN(VSTR);}
+	\\[' '\t\n\r]	{adjust(); BEGIN(VSTR);}
 	\\n	 {adjust(); str_add('\n');}
 	\\t	{adjust(); str_add('\t');}
 	\\^[a-zA-Z] adjust();
 	\\[0-9]{3}	{adjust(); str_add(atoi(yytext+1));}
 	\\\"	{adjust(); str_add('\"');}
 	\\\\	{adjust(); str_add('\\');}
-	\\[^ntf\"\\] {adjust(); flag = FALSE; EM_error(EM_tokPos, "unknown escape sequence: '\\%c'", yytext[1]);}
+	\\[^ntf\"\\' '\t\n\r] {adjust(); flag = FALSE; EM_error(EM_tokPos, "unknown escape sequence: '\\%c'", yytext[1]);}
 	\n	 {adjust(); EM_newline(); str_add('\n');}
 	\r
 	. {adjust(); str_add(yytext[0]);}
@@ -87,7 +87,7 @@ void str_del() {
 
  /* VSTR state */
 <VSTR>{
-	f\\ {adjust(); BEGIN(STR);}
+	\\ {adjust(); BEGIN(STR);}
 	\n	 {adjust(); EM_newline();}
 	\r
 	.	 adjust(); 
@@ -107,7 +107,7 @@ void str_del() {
 \n	 {adjust(); EM_newline(); continue;}
 \r
 
- /* Punctuation */
+ /* Punctuation Symbols */
 ","	 {adjust(); return COMMA;}
 ":"	 {adjust(); return COLON;}
 ";"	 {adjust(); return SEMICOLON;}
@@ -132,7 +132,7 @@ void str_del() {
 "|"	 {adjust(); return OR;}
 ":=" {adjust(); return ASSIGN;}
 
- /* Critical Words */
+ /* Reserved Words */
 array	{adjust(); return ARRAY;}
 if		{adjust(); return IF;}
 then	{adjust(); return THEN;}
