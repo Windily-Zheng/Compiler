@@ -8,15 +8,8 @@
 #include "frame.h"
 #include "translate.h"
 
-#define DB 0
 
 /***************** frame ***********************/
-struct Tr_level_ {
-	Tr_level parent;
-	Temp_label name;
-	F_frame frame;
-	Tr_accessList formals;
-};
 
 struct Tr_access_ {
 	Tr_level level;
@@ -49,9 +42,7 @@ static Tr_exp Tr_Ex(T_exp ex);
 static Tr_exp Tr_Nx(T_stm nx);
 static Tr_exp Tr_Cx(patchList trues, patchList falses, T_stm stm);
 
-static T_exp unEx(Tr_exp e);
-static T_stm unNx(Tr_exp e);
-static struct Cx unCx(Tr_exp e);
+
 
 static T_exp trackLink(Tr_level l, Tr_level g);		//track static link from l to g
 static T_expList Tr_transExpList(Tr_expList l);
@@ -99,7 +90,7 @@ F_fragList Tr_getResult() {
 }
 
 void Tr_procEntryExit(Tr_level level, Tr_exp body, Tr_accessList formals) {
-	// todo:
+
 	F_frag frag = F_ProcFrag(unNx(body), level->frame);
 	fragList = F_FragList(frag, fragList);
 }
@@ -150,13 +141,7 @@ Tr_exp Tr_callExp(Temp_label fun, Tr_expList el, Tr_level lev, Tr_level call) {
 	assert(fun);
 	T_expList args = Tr_transExpList(el);	
 	args = T_ExpList(trackLink(call, lev->parent), args);
-	/*
-#if DB
-	printf("-------call----------\n");
-	pr_tree_exp(stdout, T_Call(T_Name(fun), args), 3);
-	putchar('\n');
-#endif
-*/
+	
 	return Tr_Ex(T_Call(T_Name(fun), args));	
 }
 
@@ -198,7 +183,6 @@ Tr_exp Tr_eqStrExp(A_oper oper, Tr_exp left, Tr_exp right) {
 		return Tr_Ex(ans);
 	else
 		return Tr_Ex(T_Binop(T_minus, T_Const(1), ans));	
-	//<>: 1-1 = 0   1-0=1
 }
 
 Tr_exp Tr_eqRefExp(A_oper oper, Tr_exp left, Tr_exp right) {
@@ -235,25 +219,21 @@ Tr_exp Tr_recordExp(int n, Tr_expList l) {
 }
 
 Tr_exp Tr_arrayExp(Tr_exp size, Tr_exp init) {
-	//todo ????
+
 	assert(size && init);
 	return Tr_Ex(F_externalCall(String("initArray"), 
 								 T_ExpList(unEx(size), 
 								 T_ExpList(unEx(init), NULL))));
 }
 
-//Tr_expList ÄæÐò´¦Àí
+
 Tr_exp Tr_seqExp(Tr_expList l) {
 	assert(l);	
 	T_exp seq = unEx(l->head);
 	Tr_expList ptr;
 	for (ptr = l->tail; ptr; ptr = ptr->tail) 
 		seq = T_Eseq(unNx(ptr->head), seq);
-#if DB
-	printf("-----seqExp---------\n");
-	printStmList(stdout, T_StmList(T_Exp(seq), NULL));
-	putchar('\n');
-#endif
+
 	return Tr_Ex(seq);
 }
 
@@ -270,7 +250,6 @@ Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee) {
 	doPatch(cond.falses, f);
 
 	if (!elsee) {	
-		//if - then
 		if (then->kind == Tr_cx) {
 			return Tr_Nx(T_Seq(cond.stm, 
 						  T_Seq(T_Label(t),
@@ -297,7 +276,7 @@ Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee) {
 									T_Label(join))))))));
 		} else {
 			Temp_temp r = Temp_newtemp();
-			//todo:  special treatment for cx
+
 			return Tr_Ex(T_Eseq(cond.stm, 
 						  T_Eseq(T_Label(t),
 						   T_Eseq(T_Move(T_Temp(r), unEx(then)),
@@ -311,13 +290,7 @@ Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee) {
 }
 
 Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Tr_exp done) {
-/*
-	test: 
-		  if not(cond) goto done 
-		  body
-		  goto test
-	done:
-*/		
+
 	assert(test && body);
 	struct Cx cond = unCx(test);
 	Temp_label lbTest = Temp_newlabel();
@@ -334,20 +307,7 @@ Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Tr_exp done) {
 }
 
 Tr_exp Tr_forExp(Tr_level lev, Tr_access iac, Tr_exp lo, Tr_exp hi, Tr_exp body, Tr_exp done) {
-/*
-	let
-		var i = lo
-		var limit = high
-	in
-		if (i < limit)
-			do body	i++
-			while i < limit
-	end
-*/
-/*
-   while (i <= lim)
-   do (body; i++)
- */
+
 	T_stm istm = unNx(Tr_assignExp(Tr_simpleVar(iac, lev), lo));
 	Tr_access limac = Tr_allocLocal(lev, FALSE);
 	T_stm limstm = unNx(Tr_assignExp(Tr_simpleVar(limac, lev), hi));
@@ -451,7 +411,7 @@ static Tr_exp Tr_Cx(patchList trues, patchList falses, T_stm stm) {
 	return e;
 }
 
-static T_exp unEx(Tr_exp e) {
+T_exp unEx(Tr_exp e) {
 	assert(e);
 	switch (e->kind) {
 		case Tr_ex:
@@ -475,7 +435,7 @@ static T_exp unEx(Tr_exp e) {
 	assert(0);
 }
 
-static T_stm unNx(Tr_exp e) {
+T_stm unNx(Tr_exp e) {
 	assert(e);
 	switch (e->kind) { 
 		case Tr_ex:
@@ -499,11 +459,10 @@ static T_stm unNx(Tr_exp e) {
 	assert(0);
 }
 
-static struct Cx unCx(Tr_exp e) {
+struct Cx unCx(Tr_exp e) {
 	assert(e);
 	switch (e->kind) {
 		case Tr_ex: {
-			//todo:   special const(1) const(0)
 			T_stm s = T_Cjump(T_ne, e->u.ex, T_Const(0), NULL, NULL);
 			patchList t = PatchList(&(s->u.CJUMP.true), NULL);
 			patchList f = PatchList(&(s->u.CJUMP.false), NULL);

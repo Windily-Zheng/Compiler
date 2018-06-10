@@ -7,6 +7,7 @@
 #include "translate.h"
 #include "env.h"
 #include "semant.h"
+#include "printtree.h"
 
 #define DB 1
 
@@ -16,11 +17,14 @@ struct varRecord{
 	int kind;
 	S_symbol symbol;
 	int modified;
+	Tr_level level;
 	union {
 		int int_value;
 		string str_value;
 	}u;
 };
+
+
 
 struct varRecord var_arr[20];
 
@@ -77,9 +81,19 @@ F_fragList SEM_transProg(A_exp exp) {
 	S_table venv = E_base_venv();
 	loop = 0;
 	s = set_init();
-	transExp(Tr_outermost(), NULL, venv, tenv, exp);
+	struct expty trans_code = transExp(Tr_outermost(), NULL, venv, tenv, exp);
+	
+	Tr_exp list = trans_code.exp;
+	
+
+
+		
 #if DB
+
+	printf("************** Middle Tree ******************\n\n");
 	F_printFragList(Tr_getResult());
+	printf("\n");
+	pr_tree_exp(stdout, unEx(list), 0);
 #endif
 	return Tr_getResult();
 }
@@ -87,14 +101,24 @@ F_fragList SEM_transProg(A_exp exp) {
 struct expty transVar(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv, A_var v) {
 	assert(level);
 	int i;
+	Tr_level tmp = level;
 	switch (v->kind) {
 		case A_simpleVar: {
 		
 			
-			for (i = 0; i < var_num; i++)
+			for (i = (var_num-1); i >= 0; i--)
 			{
 				if ( var_arr[i].symbol == v->u.simple && var_arr[i].modified == 0)
 				{
+					while (tmp)
+					{
+						if (tmp == var_arr[i].level)
+							break;
+						
+						tmp = tmp->parent;
+					}
+					if (!tmp)
+						continue;
 					find = i;
 
 					if (var_arr[i].kind == 1)
@@ -103,7 +127,7 @@ struct expty transVar(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv,
 					}
 						
 					else
-						return expTy(Tr_intExp(var_arr[i].u.int_value), Ty_String());
+						return expTy(Tr_stringExp(var_arr[i].u.str_value), Ty_String());
 				}
 			}
 
@@ -171,6 +195,7 @@ struct expty transExp(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv,
 			Ty_tyList tl = fun->u.fun.formals;
 			A_expList el = a->u.call.args;
 			Tr_expList h = NULL, t = NULL;
+
 			for (; tl && el; tl = tl->tail, el = el->tail) {
 				struct expty exp = transExp(level, breakk, venv, tenv, el->head);
 				if (!cmp_ty(tl->head, exp.ty)) {
@@ -411,7 +436,7 @@ Tr_exp transDec(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv, A_dec
 				else {
 					if (!cmp_ty(t, e.ty)) 
 						EM_error(d->pos, "var init type mismatch");
-#if DB
+
 					if (d->u.var.init->kind == A_intExp && var_num < 20)
 					{
 						for (j = 0; j < var_num; j++)
@@ -422,6 +447,7 @@ Tr_exp transDec(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv, A_dec
 							}
 						if (i == var_num)
 							var_num++;
+						var_arr[i].level = level;
 						var_arr[i].modified = 0;
 						var_arr[i].kind = 1;
 						var_arr[i].symbol = d->u.var.var;
@@ -439,6 +465,7 @@ Tr_exp transDec(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv, A_dec
 								}
 							if (i == var_num)
 								var_num++;
+							var_arr[i].level = level;
 							var_arr[i].modified = 0;
 							var_arr[i].kind = 2;
 							var_arr[i].symbol = d->u.var.var;
@@ -447,7 +474,7 @@ Tr_exp transDec(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv, A_dec
 					    }
 					else
 						printf("var: %s escape: %d\n", S_name(d->u.var.var), d->u.var.escape);
-#endif
+
 					S_enter(venv, d->u.var.var, E_VarEntry(ac, t));
 					return Tr_assignExp(Tr_simpleVar(ac, level), e.exp);
 				}
@@ -456,7 +483,7 @@ Tr_exp transDec(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv, A_dec
 				EM_error(d->pos, "initialize with no value");
 			else if (e.ty == Ty_Nil())
 				EM_error(d->pos, "'%s' is not a record", S_name(d->u.var.var));
-#if DB
+
 			if (d->u.var.init->kind == A_intExp && var_num < 20)
 			{
 				for (j = 0; j < var_num; j++)
@@ -467,6 +494,7 @@ Tr_exp transDec(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv, A_dec
 					}
 				if (i == var_num)
 					var_num++;
+				var_arr[i].level = level;
 				var_arr[i].modified = 0;
 				var_arr[i].kind = 1;
 				var_arr[i].symbol = d->u.var.var;
@@ -484,6 +512,7 @@ Tr_exp transDec(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv, A_dec
 						}
 					if (i == var_num)
 						var_num++;
+					var_arr[i].level = level;
 					var_arr[i].modified = 0;
 					var_arr[i].kind = 2;
 					var_arr[i].symbol = d->u.var.var;
@@ -492,7 +521,7 @@ Tr_exp transDec(Tr_level level, Tr_exp breakk, S_table venv, S_table tenv, A_dec
 				}
 				else
 					printf("var: %s escape: %d\n", S_name(d->u.var.var), d->u.var.escape);
-#endif
+
 			S_enter(venv, d->u.var.var, E_VarEntry(ac, e.ty));
 			return Tr_assignExp(Tr_simpleVar(ac, level), e.exp);
 		}

@@ -15,7 +15,7 @@ static S_symbol mksymbol(string name, S_symbol next)
 	return s;
 }
 
-#define SIZE 109  /* should be prime */
+#define SIZE 109 
 
 static S_symbol hashtable[SIZE];
 

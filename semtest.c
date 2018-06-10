@@ -14,7 +14,9 @@ int main(int argc, char **argv) {
 	}
 	A_exp s = parse(argv[1]);
 //	if (s)
-//		pr_exp(stdout, s, 4);
+	printf("************** Abstract Syntax Tree ******************\n\n");
+		pr_exp(stdout, s, 4);
+		printf("\n\n\n");
 	if (!s)
 		return 0;
 
