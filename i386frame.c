@@ -1,12 +1,14 @@
 #include "util.h"
 #include "temp.h"
 #include "frame.h"
+#include "assem.h"
 
 #define DB 0
 
 struct F_frame_ {
 	F_accessList formals, locals;
 	int local_count;
+	F_access lastEscape;
 	Temp_label label;
 };
 
@@ -20,6 +22,20 @@ struct F_access_ {
 
 const int F_wordSize = 4;		//i386: 32bit
 static const int F_keep = 4;	//number of parameters kept in regs;
+
+Temp_map F_tempMap = NULL;
+Temp_map F_TempMap()
+{
+	if (F_tempMap)
+	{
+		return  F_tempMap;
+	}
+	else
+	{
+		F_tempMap = Temp_empty();
+		return  F_tempMap;
+	}
+}
 
 static F_access InFrame(int offset);
 static F_access InReg(Temp_temp reg);
@@ -43,6 +59,135 @@ Temp_temp F_RV() {
 	if (!t)
 		t = Temp_newtemp();
 	return t;
+}
+
+
+Temp_tempList F_registers(void) {
+	static Temp_tempList regs = NULL;
+	if (regs == NULL) {
+		Temp_map regmap = Temp_empty();
+		string p[8];
+		int i;
+		p[0] = "eax"; p[1] = "edx"; p[2] = "ebx"; p[3] = "ecx"; p[4] = "esi"; p[5] = "edi"; p[6] = "ebp"; p[7] = "esp";
+		for (i = 1; i <= 8; i++) {
+			regs = Temp_TempList(Temp_newtemp(), regs);
+			Temp_enter(regmap, regs->head, p[8 - i]);
+		}
+		F_tempMap = Temp_layerMap(regmap, Temp_name());
+}
+	return regs;
+}
+
+AS_instrList F_useSpill(F_frame f, F_access spill, Temp_temp temp) {
+	AS_instr in;
+	AS_instrList ins;
+	char buf[100];
+	int con;
+
+	assert(spill->kind == inFrame);
+	con = spill->u.offset;
+	if (con < 0) {
+		con = -con;
+		sprintf(buf, "mov `d0, [`s0-%d]\n", con);
+	}
+	else {
+		sprintf(buf, "mov `d0, [`s0+%d]\n", con);
+	}
+	in = AS_Oper(String(buf), Temp_TempList(temp, NULL), Temp_TempList(F_FP(), NULL), NULL);
+	ins = AS_InstrList(in, NULL);
+	return ins;
+}
+
+AS_instrList F_defineSpill(F_frame f, F_access spill, Temp_temp temp) {
+	AS_instr in;
+	AS_instrList ins;
+	char buf[100];
+	int con;
+
+	assert(spill->kind == inFrame);
+	con = spill->u.offset;
+	if (con < 0) {
+		con = -con;
+		sprintf(buf, "mov [`s0-%d], `s1\n", con);
+	}
+	else {
+		sprintf(buf, "mov [`s0+%d], `s1\n", con);
+	}
+	in = AS_Oper(String(buf), NULL, Temp_TempList(F_FP(), Temp_TempList(temp, NULL)), NULL);
+	ins = AS_InstrList(in, NULL);
+	return ins;
+}
+
+
+int F_getOffset(F_frame f) {
+	F_access acc = f->lastEscape;
+
+	if (acc == NULL) {
+		return 0;
+	}
+	else {
+		assert(acc->kind == inFrame);
+		return acc->u.offset;
+	}
+}
+
+static Temp_temp F_eax() {
+	Temp_tempList regs = F_registers();
+
+	return regs->head;
+}
+
+static Temp_temp F_edx() {
+	Temp_tempList regs = F_registers();
+
+	return regs->tail->head;
+}
+
+static Temp_temp F_ebx() {
+	Temp_tempList regs = F_registers();
+
+	return regs->tail->tail->head;
+}
+
+static Temp_temp F_ecx() {
+	Temp_tempList regs = F_registers();
+
+	return regs->tail->tail->tail->head;
+}
+
+static Temp_temp F_esi() {
+	Temp_tempList regs = F_registers();
+
+	return regs->tail->tail->tail->tail->head;
+}
+
+static Temp_temp F_edi() {
+	Temp_tempList regs = F_registers();
+
+	return regs->tail->tail->tail->tail->tail->head;
+}
+
+static Temp_temp F_ebp() {
+	Temp_tempList regs = F_registers();
+
+	return regs->tail->tail->tail->tail->tail->tail->head;
+}
+
+static Temp_temp F_esp() {
+	Temp_tempList regs = F_registers();
+
+	return regs->tail->tail->tail->tail->tail->tail->tail->head;
+}
+
+
+
+Temp_temp F_SP(void) {
+	Temp_tempList regs = F_registers(), ptr;
+	ptr = regs;
+	while (ptr->tail != NULL) {
+		ptr = ptr->tail;
+	}
+	return ptr->head;
 }
 
 F_frame F_newFrame(Temp_label name, U_boolList formals) {
